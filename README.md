@@ -1,9 +1,9 @@
-# Stacked Sequence GAN Project
+# Generating_Synthetic_Data_Using_GAN
 
-This project implements a **Stacked GAN** for generating synthetic  DNA-like sequences composed of the alphabet `A, T, G, C`.  
+This project implements a **Stacked GAN** for generating synthetic DNA-like sequences composed of the biological codons like `A, T, G, C`.  
 It demonstrates how to stack two GANs end-to-end: one for coarse sequence generation, and another for refinement.
 
-⚠️ **Note:** This project is for **educational purposes only** and uses synthetic toy data.  
+⚠️ **Note:** This project is for **educational purposes only** and uses to generate DNA synthetic data on the basis of training dataset taken from NCBI.  
 Do **not** use for real biological/genomic applications.
 
 ---
