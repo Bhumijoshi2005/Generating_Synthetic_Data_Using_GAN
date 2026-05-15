@@ -1,0 +1,8 @@
+__pycache__
+*.pyc
+.git
+logs
+outputs
+figures
+metrics
+data
