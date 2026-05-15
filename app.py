@@ -19,6 +19,11 @@ from utils.user_manager import (
 )
 import compare_models
 
+
+def clear_gpu():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("APP_SECRET_KEY", "stacked-seqgan-dev-key")
 
@@ -44,8 +49,8 @@ if not os.path.exists(CHECKPOINT_PATH) and not USE_BAGGING:
     raise FileNotFoundError(f"No checkpoint found at {CHECKPOINT_PATH} or {BAGGING_PATH}")
 
 
-device = torch.device("cuda")
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"✅ Using device: {device}")
 
 if USE_BAGGING:
     print("🎲 Loading BAGGING ensemble models...")
@@ -58,7 +63,10 @@ if USE_BAGGING:
         print(f"   Found {n_models} bagging models")
         
         
-        first_checkpoint = torch.load(os.path.join(BAGGING_PATH, bagging_files[0]), map_location=device)
+        first_checkpoint = torch.load(
+    os.path.join(BAGGING_PATH, bagging_files[0]),
+    map_location=device
+)
         tokenizer = first_checkpoint["tokenizer"]
         
         
@@ -77,7 +85,10 @@ if USE_BAGGING:
 
 
 if not USE_BAGGING:
-    checkpoint = torch.load(CHECKPOINT_PATH, map_location=device)
+    checkpoint = torch.load(
+    CHECKPOINT_PATH,
+    map_location=device
+)
     
     
     gan_loaded = False
@@ -874,15 +885,37 @@ def _validation_metrics():
         real_tok.decode(seq.cpu().numpy().tolist() if hasattr(seq, "cpu") else seq)
         for seq in real_ds[: min(len(real_ds), 2000)]
     ]
+def length_stats(seqs):
+    arr = np.array([len(s) for s in seqs], dtype=float)
 
-    def length_stats(seqs):
-        arr = np.array([len(s) for s in seqs], dtype=float)
-        if arr.size == 0:
-            return {"min": 0.0, "max": 0.0, "mean": 0.0, "n50": 0.0}
-        print(arr)                                                                                                                                  
+    if arr.size == 0:
+        return {
+            "min": 0.0,
+            "max": 0.0,
+            "mean": 0.0,
+            "n50": 0.0
+        }
 
+    def n50(lengths):
+        lengths = np.sort(lengths)[::-1]
+        half = lengths.sum() / 2.0
+        run = 0.0
+
+        for L in lengths:
+            run += L
+            if run >= half:
+                return float(L)
+
+        return float(lengths[-1])
+
+    return {
+        "min": float(arr.min()),
+        "max": float(arr.max()),
+        "mean": float(arr.mean()),
+        "n50": n50(arr),
+    }   
         
-        def n50(lengths):
+    def n50(lengths):
             lengths = np.sort(lengths)[::-1]
             half = lengths.sum() / 2.0
             run = 0.0
@@ -892,7 +925,7 @@ def _validation_metrics():
                     return float(L)
             return float(lengths[-1])
 
-        return {
+    return {
             "min": float(arr.min()),
             "max": float(arr.max()),
             "mean": float(arr.mean()),
@@ -1164,7 +1197,8 @@ def generate():
             model_type = "bagging_ensemble"
             n_models = len(bagging.models)
         elif 'gan' in globals():
-            sequences_int = gan.generate(n_samples=num_sequences)
+            with torch.no_grad():
+                sequences_int = gan.generate(n_samples=num_sequences)
             model_type = "single_model"
             n_models = 1
         else:
@@ -1208,4 +1242,8 @@ def generate():
 # Run Flask
 # -------------------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 5000)),
+        debug=True
+    )
